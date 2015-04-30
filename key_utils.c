@@ -32,10 +32,7 @@ int generatePem(char **pem) {
     PEM_write_bio_ECPrivateKey(out, eckey, NULL, NULL, 0, NULL, NULL);
 //
     BIO_get_mem_ptr(out, &buf);
-//
-    //memset(pem, '\0', 240);
-//
-//
+
      //TODO: refactor?
     if ( buf->data[219] == '\n') {
         memcpy(*pem, buf->data, 219);
@@ -44,7 +41,7 @@ int generatePem(char **pem) {
     } else {
         memcpy(*pem, buf->data, 223);
     }
-//
+
     EC_KEY_free(eckey);
     BIO_free_all(out);
 
@@ -147,11 +144,80 @@ int generateSinFromPem(char *pem, char *sin) {
     createDataWithHexString(pub, &outBytes);
     printf("Pub key: %s\n", pub);
 
-    char *result = calloc(64, sizeof(char));
+    char *result = calloc(65, sizeof(char));
     printf("OutBytes: %0x\n", outBytes);
-    sha256ofHex(outBytes, &result);
+    sha256ofHex(outBytes, &result, "sha256");
+    result[65] = '\0';
+    printf("Result: %s\n", result);
+
+    u_int8_t *outBytesR = malloc(sizeof(u_int8_t ) * 33);
+    createDataWithHexString(result, &outBytesR);
+
+    char *ripe = calloc(41, sizeof(char));
+    sha256ofHex(outBytesR, &ripe, "ripemd160");
+    ripe[41] = '\0';
+    printf("Ripe: %s\n", ripe);
+    char * step3 = malloc(sizeof(char) * 45);
+    sprintf(step3, "0F02%s", ripe);
+    printf("step 3: %s\n", step3);
+    
+    u_int8_t *outBytesDS1 = malloc(sizeof(u_int8_t ) * 23);
+    createDataWithHexString(step3, &outBytesDS1);
+    char *step4a = calloc(65, sizeof(char));
+    sha256ofHex(outBytesDS1, &step4a, "sha256");
+
+    u_int8_t *outBytesDS2 = malloc(sizeof(u_int8_t ) * 23);
+    createDataWithHexString(step4a, &outBytesDS2);
+    char *step4b = calloc(65, sizeof(char));
+    sha256ofHex(outBytesDS2, &step4b, "sha256");
+    printf("step 4: %s\n", step4b);
+
+    char *step5 = calloc(9 , sizeof(char));
+    memcpy(step5, step4b, 8);
+    printf("Step 5: %s\n", step5);
+    
+    char *step6 = calloc(53, sizeof(char));
+    sprintf(step6, "%s%s", step3, step5);
+    printf("Step 6: %s\n", step6);
+
+    BIGNUM *bnfromhex = BN_new();
+    BN_hex2bn(&bnfromhex, step6);
+    char *codeString = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
 
+    char buildString[35];
+    int lengthofstring = 0;
+    int startat = 34;
+
+    while(BN_is_zero(bnfromhex) != 1){
+      int rem = BN_mod_word(bnfromhex, 58);
+      buildString[startat] = codeString[rem];
+      BN_div_word(bnfromhex, 58);
+      lengthofstring++;
+      startat--;
+    }
+    startat ++;
+    char *base58encode = calloc(lengthofstring, sizeof(char));
+    int j = 0;
+    int i;
+    for (i = startat; i < lengthofstring; i++) {
+      base58encode[j] = buildString[i];
+      j++;
+    }
+
+    printf("Base58: %s\n", base58encode);
+      
+    free(base58encode);
+    free(step6);
+    free(step5);
+    free(step4a);
+    free(step4b);
+    free(outBytesR);
+    free(outBytesDS1);
+    free(outBytesDS2);
+    free(step3);
+    free(result);
+    free(ripe);
     free(pub);
     free(outBytes);
     return NOERROR;
@@ -261,7 +327,7 @@ int createDataWithHexString(char *inputString, uint8_t **result) {
 }
 
 
-int sha256ofHex(uint8_t *message, char **output) {
+int sha256ofHex(uint8_t *message, char **output, char *type) {
     EVP_MD_CTX *mdctx;
     const EVP_MD *md;
     unsigned char md_value[EVP_MAX_MD_SIZE];
@@ -269,7 +335,7 @@ int sha256ofHex(uint8_t *message, char **output) {
 
     OpenSSL_add_all_digests();
 
-    md = EVP_get_digestbyname("sha256");
+    md = EVP_get_digestbyname(type);
     mdctx = EVP_MD_CTX_create();
     EVP_DigestInit_ex(mdctx, md, NULL);
     EVP_DigestUpdate(mdctx, message, strlen(message));
@@ -280,7 +346,13 @@ int sha256ofHex(uint8_t *message, char **output) {
     for(i = 0; i < md_len; i++)
         printf("%02x", md_value[i]);
     printf("\n");
-
+    printf("MD length: %d\n", md_len);
+    char *digest = calloc(md_len*2, sizeof(char));
+    for(i = 0; i < md_len; i++)
+      sprintf(&digest[strlen(digest)], "%02x", md_value[i]);
+    printf("not digest: %s\n", digest); 
+    memcpy(*output, digest, strlen(digest));
+    free(digest);
     /* Call this once before exit. */
     EVP_cleanup();
     return 0;

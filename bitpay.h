@@ -25,3 +25,4 @@ int getPublicKeyFromPem(char *pemstring, char *pubkey);
 int hexOfsha256(uint8_t *data, int inLength, char *output);
 int digestofHex(uint8_t *message, char **output, char *type);
 int createDataWithHexString(char *inputString, uint8_t **result);
+int base58encode(char *input, char *base58encode);

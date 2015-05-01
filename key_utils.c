@@ -58,6 +58,7 @@ int generateSinFromPem(char *pem, char *sin) {
 
     char *pub =     calloc(66, sizeof(char));
 
+
     u_int8_t *outBytesPub = calloc(33, sizeof(u_int8_t));
     u_int8_t *outBytesOfStep1 = calloc(33, sizeof(u_int8_t));
     u_int8_t *outBytesOfStep3 = calloc(23, sizeof(u_int8_t));
@@ -71,8 +72,9 @@ int generateSinFromPem(char *pem, char *sin) {
     char *step5 =   calloc(9, sizeof(char));
     char *step6 =   calloc(53, sizeof(char));
 
+    char *base58OfStep6 = calloc(53, sizeof(char));
+
     getPublicKeyFromPem(pem, pub);
-    //strcpy(pub, "020AFABD2AC85F5166FC134E44A737D04D1822216E012E6920CFC54B04E30A5045");
 
     unsigned int inLength = strlen(pub);
     
@@ -97,36 +99,11 @@ int generateSinFromPem(char *pem, char *sin) {
     digestofHex(outBytesOfStep4a, &step4b, "sha256");
     step4b[64] = '\0';
 
-
     memcpy(step5, step4b, 8);
     
     sprintf(step6, "%s%s", step3, step5);
 
-    BIGNUM *bnfromhex = BN_new();
-    BN_hex2bn(&bnfromhex, step6);
-    char *codeString = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-
-
-    char buildString[35];
-    int lengthofstring = 0;
-    int startat = 34;
-
-    while(BN_is_zero(bnfromhex) != 1){
-      int rem = BN_mod_word(bnfromhex, 58);
-      buildString[startat] = codeString[rem];
-      BN_div_word(bnfromhex, 58);
-      lengthofstring++;
-      startat--;
-    }
-    startat ++;
-    char *base58encode = calloc(lengthofstring, sizeof(char));
-    int j = 0;
-    int i;
-    for (i = startat; i < lengthofstring; i++) {
-      base58encode[j] = buildString[i];
-      j++;
-    }
-
+    base58encode(step6, base58OfStep6);
 
     printf("Compressed Pub: %s\n\n", pub);
     printf("step 1: %s\n", step1);
@@ -136,7 +113,7 @@ int generateSinFromPem(char *pem, char *sin) {
     printf("step 4b: %s\n", step4b);
     printf("Step 5: %s\n", step5);
     printf("Step 6: %s\n", step6);
-    printf("Base58: %s\n", base58encode);
+    printf("Base58: %s\n", base58OfStep6);
     
     free(pub);  
     free(step1);
@@ -146,7 +123,7 @@ int generateSinFromPem(char *pem, char *sin) {
     free(step4b);
     free(step6);
     free(step5);
-    free(base58encode);
+    free(base58OfStep6);
 
     free(outBytesPub);
     free(outBytesOfStep1);
@@ -199,15 +176,20 @@ int getPublicKeyFromPem(char *pemstring, char *pubkey) {
 
     char *hexPointxInit = hexPoint + 2;
     memcpy(xval, hexPointxInit, 64);
+    printf("x val: %s\n", xval);
 
     char *hexPointyInit = hexPoint + 66;
     memcpy(yval, hexPointyInit, 64);
+    printf("y val: %s\n", yval);
 
     char *lastY = hexPoint + 129;
+    hexPoint[130] = '\0';
 
     if (strstr(oddNumbers, lastY) != NULL) {
+        printf("Last-y %s is odd.\n", lastY);
         sprintf(pubkey, "03%s", xval);
     } else {
+        printf("Last-y %s is even.\n", lastY);
         sprintf(pubkey, "02%s", xval);
     }
 
@@ -257,6 +239,35 @@ int createDataWithHexString(char *inputString, uint8_t **result) {
     return NOERROR;
 }
 
+int base58encode(char *input, char *base58encode) {
+    BIGNUM *bnfromhex = BN_new();
+    BN_hex2bn(&bnfromhex, input);
+    char *codeString = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+    char buildString[35];
+    int lengthofstring = 0;
+    int startat = 34;
+
+    while(BN_is_zero(bnfromhex) != 1){
+      int rem = BN_mod_word(bnfromhex, 58);
+      buildString[startat] = codeString[rem];
+      BN_div_word(bnfromhex, 58);
+      lengthofstring++;
+      startat--;
+    }
+    startat ++;
+    
+    int j = 0;
+    int i;
+    for (i = startat; i < lengthofstring; i++) {
+      base58encode[j] = buildString[i];
+      j++;
+    }
+
+    BN_free(bnfromhex);
+
+    return NOERROR;
+}
 
 int digestofHex(uint8_t *message, char **output, char *type) {
     EVP_MD_CTX *mdctx;

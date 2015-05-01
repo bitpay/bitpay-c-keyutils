@@ -61,38 +61,41 @@ int generateSinFromPem(char *pem, char *sin) {
     u_int8_t *outBytesPub = calloc(33, sizeof(u_int8_t));
     u_int8_t *outBytesOfStep1 = calloc(33, sizeof(u_int8_t));
     u_int8_t *outBytesOfStep3 = calloc(23, sizeof(u_int8_t));
-    u_int8_t *outBytesOfStep4a = calloc(23, sizeof(u_int8_t));
+    u_int8_t *outBytesOfStep4a = calloc(33, sizeof(u_int8_t));
 
     char *step1 =   calloc(65, sizeof(char));
     char *step2 =   calloc(41, sizeof(char));
     char *step3 =   calloc(45, sizeof(char));
-    char *step4a =  calloc(165, sizeof(char));
-    char *step4b =  calloc(165, sizeof(char));
+    char *step4a =  calloc(65, sizeof(char));
+    char *step4b =  calloc(65, sizeof(char));
     char *step5 =   calloc(9, sizeof(char));
     char *step6 =   calloc(53, sizeof(char));
 
-    // getPublicKeyFromPem(pem, pub);
-    strcpy(pub, "020AFABD2AC85F5166FC134E44A737D04D1822216E012E6920CFC54B04E30A5045");
+    getPublicKeyFromPem(pem, pub);
+    //strcpy(pub, "020AFABD2AC85F5166FC134E44A737D04D1822216E012E6920CFC54B04E30A5045");
 
     unsigned int inLength = strlen(pub);
     
     createDataWithHexString(pub, &outBytesPub);
-
     digestofHex(outBytesPub, &step1, "sha256");
     step1[64] = '\0';
 
-    
     createDataWithHexString(step1, &outBytesOfStep1);
     digestofHex(outBytesOfStep1, &step2, "ripemd160");
     step2[40] = '\0';
-    
-    sprintf(step3, "0F02%s", step2);
-    
+   
+    memcpy(step3, "0F02", 4);
+    memcpy(step3+4, step2, 40);
+    // sprintf(step3, "0F02%s", step2);
+    step3[44] = '\0';
+
     createDataWithHexString(step3, &outBytesOfStep3);
     digestofHex(outBytesOfStep3, &step4a, "sha256");
+    step4a[64] = '\0';
 
     createDataWithHexString(step4a, &outBytesOfStep4a);
     digestofHex(outBytesOfStep4a, &step4b, "sha256");
+    step4b[64] = '\0';
 
 
     memcpy(step5, step4b, 8);
@@ -129,7 +132,8 @@ int generateSinFromPem(char *pem, char *sin) {
     printf("step 1: %s\n", step1);
     printf("Step 2: %s\n", step2);
     printf("step 3: %s\n", step3);
-    printf("step 4: %s\n", step4b);
+    printf("step 4a: %s\n", step4a);
+    printf("step 4b: %s\n", step4b);
     printf("Step 5: %s\n", step5);
     printf("Step 6: %s\n", step6);
     printf("Base58: %s\n", base58encode);

@@ -8,29 +8,17 @@ int generatePem(char **pem) {
     BIO *out = BIO_new(BIO_s_mem());
     BUF_MEM *buf = NULL;
     EC_GROUP *group = NULL;
+    
     group = EC_GROUP_new_by_curve_name(NID_secp256k1);
-
-
-
     buf = BUF_MEM_new();
     eckey = EC_KEY_new();
 
-    //// createNewKey code
-    int asn1Flag = OPENSSL_EC_NAMED_CURVE;
-    int form = POINT_CONVERSION_UNCOMPRESSED;
-
-    EC_GROUP_set_asn1_flag(group, asn1Flag);
-    EC_GROUP_set_point_conversion_form(group, form);
-    EC_KEY_set_group(eckey, group);
-
-    int resultFromKeyGen = EC_KEY_generate_key(eckey);
+    createNewKey(group, eckey);
+    
     EC_GROUP_free(group);
-//////////////////////////////
-
-//    createNewKey(eckey);
 
     PEM_write_bio_ECPrivateKey(out, eckey, NULL, NULL, 0, NULL, NULL);
-//
+
     BIO_get_mem_ptr(out, &buf);
 
      //TODO: refactor?
@@ -48,19 +36,16 @@ int generatePem(char **pem) {
     return NOERROR;
 };
 
-int createNewKey(EC_KEY *eckey) {
+int createNewKey(EC_GROUP *group, EC_KEY *eckey) {
 
     int asn1Flag = OPENSSL_EC_NAMED_CURVE;
     int form = POINT_CONVERSION_UNCOMPRESSED;
-    EC_GROUP *group = NULL;
 
-    group = EC_GROUP_new_by_curve_name(NID_secp256k1);
     EC_GROUP_set_asn1_flag(group, asn1Flag);
     EC_GROUP_set_point_conversion_form(group, form);
     EC_KEY_set_group(eckey, group);
 
     int resultFromKeyGen = EC_KEY_generate_key(eckey);
-    EC_GROUP_free(group);
 
     if (resultFromKeyGen != 1){
         return ERROR;
@@ -121,10 +106,8 @@ int generateSinFromPem(char *pem, char *sin) {
 
     if (strstr(oddNumbers, lastY) != NULL) {
         sprintf(pub, "03%s", xval);
-        printf("I just set pub.\n");
     } else {
         sprintf(pub, "02%s", xval);
-        printf("I just set pub.\n");
     }
 
     BN_CTX_free(ctx);
@@ -142,21 +125,19 @@ int generateSinFromPem(char *pem, char *sin) {
     u_int8_t *outBytes = malloc(sizeof(u_int8_t ) * inLength/2);
 
     createDataWithHexString(pub, &outBytes);
-    printf("Pub key: %s\n", pub);
 
     char *result = calloc(65, sizeof(char));
-    printf("OutBytes: %0x\n", outBytes);
-    sha256ofHex(outBytes, &result, "sha256");
+    digestofHex(outBytes, &result, "sha256");
     result[65] = '\0';
-    printf("Result: %s\n", result);
+    printf("step 1: %s\n", result);
 
     u_int8_t *outBytesR = malloc(sizeof(u_int8_t ) * 33);
     createDataWithHexString(result, &outBytesR);
 
     char *ripe = calloc(41, sizeof(char));
-    sha256ofHex(outBytesR, &ripe, "ripemd160");
+    digestofHex(outBytesR, &ripe, "ripemd160");
     ripe[41] = '\0';
-    printf("Ripe: %s\n", ripe);
+    printf("Step 2: %s\n", ripe);
     char * step3 = malloc(sizeof(char) * 45);
     sprintf(step3, "0F02%s", ripe);
     printf("step 3: %s\n", step3);
@@ -164,12 +145,12 @@ int generateSinFromPem(char *pem, char *sin) {
     u_int8_t *outBytesDS1 = malloc(sizeof(u_int8_t ) * 23);
     createDataWithHexString(step3, &outBytesDS1);
     char *step4a = calloc(65, sizeof(char));
-    sha256ofHex(outBytesDS1, &step4a, "sha256");
+    digestofHex(outBytesDS1, &step4a, "sha256");
 
     u_int8_t *outBytesDS2 = malloc(sizeof(u_int8_t ) * 23);
     createDataWithHexString(step4a, &outBytesDS2);
     char *step4b = calloc(65, sizeof(char));
-    sha256ofHex(outBytesDS2, &step4b, "sha256");
+    digestofHex(outBytesDS2, &step4b, "sha256");
     printf("step 4: %s\n", step4b);
 
     char *step5 = calloc(9 , sizeof(char));
@@ -274,10 +255,8 @@ int getPublicKeyFromPem(char *pemstring, char *pubkey) {
 
     if (strstr(oddNumbers, lastY) != NULL) {
         sprintf(pubkey, "03%s", xval);
-        printf("I just set pub.\n");
     } else {
         sprintf(pubkey, "02%s", xval);
-        printf("I just set pub.\n");
     }
 
     BN_CTX_free(ctx);
@@ -327,7 +306,7 @@ int createDataWithHexString(char *inputString, uint8_t **result) {
 }
 
 
-int sha256ofHex(uint8_t *message, char **output, char *type) {
+int digestofHex(uint8_t *message, char **output, char *type) {
     EVP_MD_CTX *mdctx;
     const EVP_MD *md;
     unsigned char md_value[EVP_MAX_MD_SIZE];
@@ -342,15 +321,10 @@ int sha256ofHex(uint8_t *message, char **output, char *type) {
     EVP_DigestFinal_ex(mdctx, md_value, &md_len);
     EVP_MD_CTX_destroy(mdctx);
 
-    printf("Digest is: ");
-    for(i = 0; i < md_len; i++)
-        printf("%02x", md_value[i]);
-    printf("\n");
-    printf("MD length: %d\n", md_len);
     char *digest = calloc(md_len*2, sizeof(char));
     for(i = 0; i < md_len; i++)
       sprintf(&digest[strlen(digest)], "%02x", md_value[i]);
-    printf("not digest: %s\n", digest); 
+
     memcpy(*output, digest, strlen(digest));
     free(digest);
     /* Call this once before exit. */

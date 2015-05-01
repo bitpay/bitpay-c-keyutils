@@ -56,52 +56,48 @@ int createNewKey(EC_GROUP *group, EC_KEY *eckey) {
 
 int generateSinFromPem(char *pem, char *sin) {
 
-    char *pub = calloc(66, sizeof(char));
+    char *pub =     calloc(66, sizeof(char));
 
-    getPublicKeyFromPem(pem, pub);
+    u_int8_t *outBytesPub = calloc(33, sizeof(u_int8_t));
+    u_int8_t *outBytesOfStep1 = calloc(33, sizeof(u_int8_t));
+    u_int8_t *outBytesOfStep3 = calloc(23, sizeof(u_int8_t));
+    u_int8_t *outBytesOfStep4a = calloc(23, sizeof(u_int8_t));
 
-    printf("Pub key: %s\n", pub);
+    char *step1 =   calloc(65, sizeof(char));
+    char *step2 =   calloc(41, sizeof(char));
+    char *step3 =   calloc(45, sizeof(char));
+    char *step4a =  calloc(165, sizeof(char));
+    char *step4b =  calloc(165, sizeof(char));
+    char *step5 =   calloc(9, sizeof(char));
+    char *step6 =   calloc(53, sizeof(char));
+
+    // getPublicKeyFromPem(pem, pub);
+    strcpy(pub, "020AFABD2AC85F5166FC134E44A737D04D1822216E012E6920CFC54B04E30A5045");
 
     unsigned int inLength = strlen(pub);
-    printf("inlength: %d\n", inLength);
-    u_int8_t *outBytes = malloc(sizeof(u_int8_t ) * inLength/2);
-
-    createDataWithHexString(pub, &outBytes);
-
-    char *result = calloc(65, sizeof(char));
-    digestofHex(outBytes, &result, "sha256");
-    result[65] = '\0';
-    printf("step 1: %s\n", result);
-
-    u_int8_t *outBytesR = malloc(sizeof(u_int8_t ) * 33);
-    createDataWithHexString(result, &outBytesR);
-
-    char *ripe = calloc(41, sizeof(char));
-    digestofHex(outBytesR, &ripe, "ripemd160");
-    ripe[41] = '\0';
-    printf("Step 2: %s\n", ripe);
-    char * step3 = malloc(sizeof(char) * 45);
-    sprintf(step3, "0F02%s", ripe);
-    printf("step 3: %s\n", step3);
     
-    u_int8_t *outBytesDS1 = malloc(sizeof(u_int8_t ) * 23);
-    createDataWithHexString(step3, &outBytesDS1);
-    char *step4a = calloc(65, sizeof(char));
-    digestofHex(outBytesDS1, &step4a, "sha256");
+    createDataWithHexString(pub, &outBytesPub);
 
-    u_int8_t *outBytesDS2 = malloc(sizeof(u_int8_t ) * 23);
-    createDataWithHexString(step4a, &outBytesDS2);
-    char *step4b = calloc(65, sizeof(char));
-    digestofHex(outBytesDS2, &step4b, "sha256");
-    printf("step 4: %s\n", step4b);
+    digestofHex(outBytesPub, &step1, "sha256");
+    step1[64] = '\0';
 
-    char *step5 = calloc(9 , sizeof(char));
+    
+    createDataWithHexString(step1, &outBytesOfStep1);
+    digestofHex(outBytesOfStep1, &step2, "ripemd160");
+    step2[40] = '\0';
+    
+    sprintf(step3, "0F02%s", step2);
+    
+    createDataWithHexString(step3, &outBytesOfStep3);
+    digestofHex(outBytesOfStep3, &step4a, "sha256");
+
+    createDataWithHexString(step4a, &outBytesOfStep4a);
+    digestofHex(outBytesOfStep4a, &step4b, "sha256");
+
+
     memcpy(step5, step4b, 8);
-    printf("Step 5: %s\n", step5);
     
-    char *step6 = calloc(53, sizeof(char));
     sprintf(step6, "%s%s", step3, step5);
-    printf("Step 6: %s\n", step6);
 
     BIGNUM *bnfromhex = BN_new();
     BN_hex2bn(&bnfromhex, step6);
@@ -128,21 +124,31 @@ int generateSinFromPem(char *pem, char *sin) {
       j++;
     }
 
+
+    printf("Compressed Pub: %s\n\n", pub);
+    printf("step 1: %s\n", step1);
+    printf("Step 2: %s\n", step2);
+    printf("step 3: %s\n", step3);
+    printf("step 4: %s\n", step4b);
+    printf("Step 5: %s\n", step5);
+    printf("Step 6: %s\n", step6);
     printf("Base58: %s\n", base58encode);
-      
-    free(base58encode);
-    free(step6);
-    free(step5);
+    
+    free(pub);  
+    free(step1);
+    free(step2);
+    free(step3);
     free(step4a);
     free(step4b);
-    free(outBytesR);
-    free(outBytesDS1);
-    free(outBytesDS2);
-    free(step3);
-    free(result);
-    free(ripe);
-    free(pub);
-    free(outBytes);
+    free(step6);
+    free(step5);
+    free(base58encode);
+
+    free(outBytesPub);
+    free(outBytesOfStep1);
+    free(outBytesOfStep3);
+    free(outBytesOfStep4a);
+    
     return NOERROR;
 }
 
@@ -180,7 +186,7 @@ int getPublicKeyFromPem(char *pemstring, char *pubkey) {
     EC_KEY_set_private_key(eckey, res);
 
     if (!EC_POINT_mul(group, pub_key, res, NULL, NULL, ctx)) {
-        raise(-1);
+        return ERROR;
     }
 
     EC_KEY_set_public_key(eckey, pub_key);

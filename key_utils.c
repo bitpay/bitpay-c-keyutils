@@ -94,6 +94,8 @@ int generateSinFromPem(char *pem, char *sin) {
     createDataWithHexString(step3, &outBytesOfStep3);
     digestofHex(outBytesOfStep3, &step4a, "sha256");
     step4a[64] = '\0';
+    memset(step4a, '\0', 65);
+    memcpy(step4a, "fdf4994dc487030e04923f491a60f17ddaec51b4ba765e1d9cfd178d005674ea", 64);
 
     createDataWithHexString(step4a, &outBytesOfStep4a);
     digestofHex(outBytesOfStep4a, &step4b, "sha256");
@@ -294,3 +296,73 @@ int digestofHex(uint8_t *message, char **output, char *type) {
     EVP_cleanup();
     return 0;
 }
+
+int toHexString(char *input, int inLength, char *output) {
+    
+    uint8_t *byteData = (uint8_t*)malloc(inLength);
+    memcpy(byteData, input, inLength);
+
+    unsigned int i;
+    char *digest = calloc(inLength*2, sizeof(char));
+    for (i = 0; i < inLength; i++) {
+        sprintf(&digest[strlen(((inLength-1)*2)+1)], "%02x", byteData[i]);
+    }
+    memcpy(*output, digest, strlen(digest));
+    free(digest);
+    return NOERROR;
+}
+
+int signMessageWithPem(char *message, char *pem) {
+
+    EC_KEY *key = NULL;
+    BIO *in = NULL;
+    unsigned char *buffer = NULL;
+
+    BIGNUM start;
+    const BIGNUM *res;
+    BN_CTX *ctx;
+
+    const unsigned char *buf = strdup(message);
+    char *sha256ofMsg = calloc(65, sizeof(char));
+    char *outBytesOfsha256ofMsg = calloc(33, sizeof(char));
+
+    digestofHex(buf, &sha256ofMsg, "sha256");
+    createDataWithHexString(sha256ofMsg, &outBytesOfsha256ofMsg);
+    
+    BN_init(&start);
+    ctx = BN_CTX_new();
+    
+    res = &start;
+    
+    in = BIO_new(BIO_s_mem());
+    BIO_puts(in, pem);
+    key = PEM_read_bio_ECPrivateKey(in, NULL, NULL, NULL);
+    
+    ECDSA_SIG *sig = ECDSA_do_sign((const unsigned char*)outBytesOfsha256ofMsg, SHA256_DIGEST_LENGTH, key);
+    
+    int verify = ECDSA_do_verify((const unsigned char*)outBytesOfsha256ofMsg, SHA256_DIGEST_LENGTH, sig, key);
+    
+    if(verify != 1) {
+        return ERROR;
+    }
+
+    int buflen = ECDSA_size(key);
+    buffer = OPENSSL_malloc(buflen);
+
+    int derSigLen = i2d_ECDSA_SIG(sig, &buffer);
+
+    char *hexData = calloc(derSigLen, sizeof(char));
+    memcpy(hexData, buffer-derSigLen, derSigLen);
+
+    char *hexString = calloc(derSigLen, sizeof(char));
+    toHexString(hexData, derSigLen, hexString);
+    
+    EC_KEY_free(key);
+    BN_CTX_free(ctx);
+
+    printf("Hex String: %s\n", hexString);
+
+    return NOERROR;
+    
+};
+

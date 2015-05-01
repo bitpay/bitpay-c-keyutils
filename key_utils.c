@@ -55,68 +55,10 @@ int createNewKey(EC_GROUP *group, EC_KEY *eckey) {
 }
 
 int generateSinFromPem(char *pem, char *sin) {
-    EC_KEY *eckey = NULL;
-    EC_KEY *key = NULL;
-    EC_POINT *pub_key = NULL;
-    BIO *in = NULL;
-    const EC_GROUP *group = NULL;
-    BN_CTX *ctx = NULL;
-    BIGNUM start;
-    BN_init(&start);
-    const BIGNUM *res;
 
     char *pub = calloc(66, sizeof(char));
-    char *hexPoint = NULL;
-    char xval[65] = "";
-    char yval[65] = "";
-    char *oddNumbers = "13579BDF";
 
-
-    ctx = BN_CTX_new();
-
-    res = &start;
-
-    const char *cPem = pem;
-    in = BIO_new(BIO_s_mem());
-    BIO_puts(in, cPem);
-    key = PEM_read_bio_ECPrivateKey(in, NULL, NULL, NULL); //////////////  Should the second argument here have a value? ?????????????????????
-    res = EC_KEY_get0_private_key(key);
-
-    eckey = EC_KEY_new_by_curve_name(NID_secp256k1);
-    group = EC_KEY_get0_group(eckey);
-    pub_key = EC_POINT_new(group);
-
-    EC_KEY_set_private_key(eckey, res);
-
-    if (!EC_POINT_mul(group, pub_key, res, NULL, NULL, ctx)) {
-        return ERROR;
-    }
-
-    EC_KEY_set_public_key(eckey, pub_key);
-
-    hexPoint = EC_POINT_point2hex(group, pub_key, 4, ctx);
-
-    char *hexPointxInit = hexPoint + 2;
-    memcpy(xval, hexPointxInit, 64);
-
-    char *hexPointyInit = hexPoint + 66;
-    memcpy(yval, hexPointyInit, 64);
-
-    char *lastY = hexPoint + 129;
-
-    if (strstr(oddNumbers, lastY) != NULL) {
-        sprintf(pub, "03%s", xval);
-    } else {
-        sprintf(pub, "02%s", xval);
-    }
-
-    BN_CTX_free(ctx);
-    EC_KEY_free(eckey);
-    EC_KEY_free(key);
-    EC_POINT_free(pub_key);
-    BIO_free(in);
-/////////////////////
-//    getPublicKeyFromPem(pem, pub);
+    getPublicKeyFromPem(pem, pub);
 
     printf("Pub key: %s\n", pub);
 

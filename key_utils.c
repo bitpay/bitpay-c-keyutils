@@ -304,10 +304,12 @@ int toHexString(char *input, int inLength, char *output) {
 
     unsigned int i;
     char *digest = calloc(inLength*2, sizeof(char));
+
     for (i = 0; i < inLength; i++) {
-        sprintf(&digest[strlen(((inLength-1)*2)+1)], "%02x", byteData[i]);
+        sprintf(&digest[strlen(digest)], "%02x", byteData[i]);
     }
-    memcpy(*output, digest, strlen(digest));
+
+    memcpy(output, digest, strlen(digest));
     free(digest);
     return NOERROR;
 }
@@ -333,7 +335,7 @@ int signMessageWithPem(char *message, char *pem) {
     ctx = BN_CTX_new();
     
     res = &start;
-    
+
     in = BIO_new(BIO_s_mem());
     BIO_puts(in, pem);
     key = PEM_read_bio_ECPrivateKey(in, NULL, NULL, NULL);
@@ -354,7 +356,8 @@ int signMessageWithPem(char *message, char *pem) {
     char *hexData = calloc(derSigLen, sizeof(char));
     memcpy(hexData, buffer-derSigLen, derSigLen);
 
-    char *hexString = calloc(derSigLen, sizeof(char));
+    char *hexString = calloc(derSigLen*2, sizeof(char));
+
     toHexString(hexData, derSigLen, hexString);
     
     EC_KEY_free(key);

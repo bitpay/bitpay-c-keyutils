@@ -17,12 +17,18 @@
 
 #define	NOERROR	0
 #define	ERROR 	-1
+#define SHA256_STRING 33
+#define SHA256_HEX_STRING 65
+#define RIPEMD_AND_PADDING 22
+#define RIPEMD_AND_PADDING_STRING 23
+#define RIPEMD_HEX 40
+#define RIPEMD_HEX_STRING 41
+#define RIPEMD_AND_PADDING_HEX_STRING 45
+#define CHECKSUM 8
+#define CHECKSUM_STRING 9
+#define SIN 52
+#define SIN_STRING 53
 
 int generatePem(char **pem);
-int createNewKey(EC_GROUP *group, EC_KEY *eckey);
-int generateSinFromPem(char *pem, char *sin);
-int getPublicKeyFromPem(char *pemstring, char *pubkey);
-int hexOfsha256(uint8_t *data, int inLength, char *output);
-int digestofHex(uint8_t *message, char **output, char *type);
-int createDataWithHexString(char *inputString, uint8_t **result);
-int base58encode(char *input, char *base58encode);
+int generateSinFromPem(char *pem, char **sin);
+int getPublicKeyFromPem(char *pemstring, char **pubkey);

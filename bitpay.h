@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include "openssl/ec.h"
 #include "openssl/bn.h"
 #include "openssl/sha.h"

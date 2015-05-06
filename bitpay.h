@@ -9,12 +9,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include "openssl/ec.h"
-#include "openssl/bn.h"
-#include "openssl/sha.h"
-#include "openssl/ripemd.h"
-#include "openssl/ecdsa.h"
-#include "openssl/pem.h"
+#include <openssl/ec.h>
+#include <openssl/bn.h>
+#include <openssl/sha.h>
+#include <openssl/ripemd.h>
+#include <openssl/ecdsa.h>
+#include <openssl/pem.h>
 
 #define	NOERROR	0
 #define	ERROR 	-1

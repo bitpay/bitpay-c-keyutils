@@ -1,5 +1,6 @@
 #include <string.h>
 #include "bitpay.h"
+static int createDataWithHexString();
 
 int generatePem(char **pem) {
 
@@ -35,7 +36,7 @@ int generatePem(char **pem) {
     return NOERROR;
 };
 
-int createNewKey(EC_GROUP *group, EC_KEY *eckey) {
+static int createNewKey(EC_GROUP *group, EC_KEY *eckey) {
 
     int asn1Flag = OPENSSL_EC_NAMED_CURVE;
     int form = POINT_CONVERSION_UNCOMPRESSED;
@@ -194,7 +195,7 @@ int getPublicKeyFromPem(char *pemstring, char **pubkey) {
     return NOERROR;
 };
 
-int createDataWithHexString(char *inputString, uint8_t **result) {
+static int createDataWithHexString(char *inputString, uint8_t **result) {
 
     int i, o = 0;
     uint8_t outByte = 0;
@@ -231,7 +232,7 @@ int createDataWithHexString(char *inputString, uint8_t **result) {
     return NOERROR;
 }
 
-int base58encode(char *input, char *base58encode) {
+static int base58encode(char *input, char *base58encode) {
     BIGNUM *bnfromhex = BN_new();
     BN_hex2bn(&bnfromhex, input);
     char *codeString = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -261,7 +262,7 @@ int base58encode(char *input, char *base58encode) {
     return NOERROR;
 }
 
-int digestOfBytes(uint8_t *message, char **output, char *type, int inLength) {
+static int digestOfBytes(uint8_t *message, char **output, char *type, int inLength) {
     EVP_MD_CTX *mdctx;
     const EVP_MD *md;
     unsigned char md_value[EVP_MAX_MD_SIZE];
@@ -306,18 +307,21 @@ int toHexString(char *input, int inLength, char *output) {
 
 int signMessageWithPem(char *message, char *pem, char **signature) {
 
+    unsigned int meslen = strlen(message);
+    unsigned char *messagebytes = calloc(meslen, sizeof(unsigned char));
+    memcpy(messagebytes, message, meslen);
+
     EC_KEY *key = NULL;
     BIO *in = NULL;
     unsigned char *buffer = NULL;
-
     BIGNUM start;
     const BIGNUM *res;
     BN_CTX *ctx;
 
     char *sha256ofMsg = calloc(SHA256_HEX_STRING, sizeof(char));
-    char *outBytesOfsha256ofMsg = calloc(SHA256_STRING, sizeof(char));
+    unsigned char *outBytesOfsha256ofMsg = calloc(SHA256_STRING, sizeof(unsigned char));
 
-    digestOfBytes(message, &sha256ofMsg, "sha256", strlen(message));
+    digestOfBytes(messagebytes, &sha256ofMsg, "sha256", meslen);
     sha256ofMsg[64] = '\0';
     createDataWithHexString(sha256ofMsg, &outBytesOfsha256ofMsg);
     

@@ -5,7 +5,7 @@ int main() {
     char *pem = malloc(240);
     char *sin = malloc(35);
     char *pub = malloc(67);
-    memset(pem, '\0', 240);
+    pem[240]='\0';
     generatePem(&pem);
     char *expected_pem_S = "MHQCAQ";
     char *expected_pem_N = "SuBBAAK\n";
@@ -68,7 +68,7 @@ int main() {
         printf("Signature is not a valid length\n");
 
     if(strcmp(actual_start, expected_start) == 0)
-        printf("\.");
+        printf("\n");
     else
         printf("Signature test - Expected: %s, Actual: %s\n", expected_start, actual_start);
     printf("\n");

@@ -1,6 +1,5 @@
 #include <string.h>
 #include "bitpay.h"
-static int createDataWithHexString();
 
 int generatePem(char **pem) {
 
@@ -56,7 +55,7 @@ static int createNewKey(EC_GROUP *group, EC_KEY *eckey) {
 
 int generateSinFromPem(char *pem, char **sin) {
     
-    char *pub =     calloc(66, sizeof(char));
+    char *pub =     calloc(67, sizeof(char));
 
     u_int8_t *outBytesPub = calloc(SHA256_STRING, sizeof(u_int8_t));
     u_int8_t *outBytesOfStep1 = calloc(SHA256_STRING, sizeof(u_int8_t));
@@ -69,11 +68,12 @@ int generateSinFromPem(char *pem, char **sin) {
     char *step4a =  calloc(SHA256_HEX_STRING, sizeof(char));
     char *step4b =  calloc(SHA256_HEX_STRING, sizeof(char));
     char *step5 =   calloc(CHECKSUM_STRING, sizeof(char));
-    char *step6 =   calloc(SIN_STRING, sizeof(char));
+    char *step6 =   calloc(RIPEMD_AND_PADDING_HEX + CHECKSUM_STRING, sizeof(char));
 
     char *base58OfStep6 = calloc(SIN_STRING, sizeof(char));
 
     getPublicKeyFromPem(pem, &pub);
+    pub[66] = '\0';
 
     unsigned int inLength = strlen(pub);
     
@@ -100,6 +100,7 @@ int generateSinFromPem(char *pem, char **sin) {
     memcpy(step5, step4b, CHECKSUM);
     
     sprintf(step6, "%s%s", step3, step5);
+    step6[RIPEMD_AND_PADDING_HEX + CHECKSUM] = '\0';
 
     base58encode(step6, base58OfStep6);
     
@@ -112,15 +113,14 @@ int generateSinFromPem(char *pem, char **sin) {
     free(step3);
     free(step4a);
     free(step4b);
-    free(step6);
     free(step5);
+    free(step6);
     free(base58OfStep6);
 
     free(outBytesPub);
     free(outBytesOfStep1);
     free(outBytesOfStep3);
     free(outBytesOfStep4a);
-    
     return NOERROR;
 }
 
@@ -277,10 +277,11 @@ static int digestOfBytes(uint8_t *message, char **output, char *type, int inLeng
     EVP_DigestFinal_ex(mdctx, md_value, &md_len);
     EVP_MD_CTX_destroy(mdctx);
 
-    char *digest = calloc(md_len*2, sizeof(char));
+    char *digest = calloc((md_len*2) + 1, sizeof(char));
     for(i = 0; i < md_len; i++){
       sprintf(&digest[2*i], "%02x", md_value[i]);
     };
+    digest[md_len * 2] = '\0';
     memcpy(*output, digest, strlen(digest));
     free(digest);
     /* Call this once before exit. */

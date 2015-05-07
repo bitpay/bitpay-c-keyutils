@@ -25,11 +25,12 @@
 #define RIPEMD_AND_PADDING_STRING 23
 #define RIPEMD_HEX 40
 #define RIPEMD_HEX_STRING 41
+#define RIPEMD_AND_PADDING_HEX 44
 #define RIPEMD_AND_PADDING_HEX_STRING 45
 #define CHECKSUM 8
 #define CHECKSUM_STRING 9
-#define SIN 52
-#define SIN_STRING 53
+#define SIN 35 
+#define SIN_STRING 36 
 
 int generatePem(char **pem);
 int generateSinFromPem(char *pem, char **sin);

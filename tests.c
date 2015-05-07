@@ -3,7 +3,8 @@
 int main() {
 
     char *pem = malloc(240);
-    char *sin = malloc(35);
+    char *sin = malloc(36);
+    sin[35] = '\0';
     char *pub = malloc(67);
     pem[240]='\0';
     generatePem(&pem);
@@ -50,7 +51,7 @@ int main() {
     char *message = "https://test.bitpay.com/invoices{\"currency\":\"USD\",\"price\":100,\"token\":\"GVTANyBKSJRdSzy88P72H2LB7gky7o4J8bebVbVaF6pA\"}";
     int signa;
     char *signature = calloc(145, sizeof(char));
-	signa = signMessageWithPem(message, pem, &signature);
+    signa = signMessageWithPem(message, pem, &signature);
     if(signa == ERROR){
         printf("Signature Error.\n");
     };

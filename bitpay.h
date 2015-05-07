@@ -37,7 +37,3 @@ int generateSinFromPem(char *pem, char **sin);
 int getPublicKeyFromPem(char *pemstring, char **pubkey);
 int signMessageWithPem(char *pem, char *message, char **signature); 
 
-static int createNewKey(EC_GROUP *group, EC_KEY *eckey);
-static int createDataWithHexString(char *inputString, uint8_t **result);
-static int base58encode(char *input, char *base58encode);
-static int digestOfBytes(uint8_t *message, char **output, char *type, int inLength);

@@ -1,6 +1,11 @@
 #include <string.h>
 #include "bitpay.h"
 
+static int createNewKey(EC_GROUP *group, EC_KEY *eckey);
+static int createDataWithHexString(char *inputString, uint8_t **result);
+static int base58encode(char *input, char *base58encode);
+static int digestOfBytes(uint8_t *message, char **output, char *type, int inLength);
+
 int generatePem(char **pem) {
 
     EC_KEY *eckey = NULL;
@@ -75,8 +80,6 @@ int generateSinFromPem(char *pem, char **sin) {
     getPublicKeyFromPem(pem, &pub);
     pub[66] = '\0';
 
-    unsigned int inLength = strlen(pub);
-    
     createDataWithHexString(pub, &outBytesPub);
     digestOfBytes(outBytesPub, &step1, "sha256", SHA256_STRING);
     step1[64] = '\0';
@@ -150,7 +153,6 @@ int getPublicKeyFromPem(char *pemstring, char **pubkey) {
     BIO_puts(in, cPem);
     key = PEM_read_bio_ECPrivateKey(in, NULL, NULL, NULL);
     res = EC_KEY_get0_private_key(key);
-    char *priv = BN_bn2hex(res);
     eckey = EC_KEY_new_by_curve_name(NID_secp256k1);
     group = EC_KEY_get0_group(eckey);
     pub_key = EC_POINT_new(group);
@@ -315,9 +317,6 @@ int signMessageWithPem(char *message, char *pem, char **signature) {
     EC_KEY *key = NULL;
     BIO *in = NULL;
     unsigned char *buffer = NULL;
-    BIGNUM start;
-    const BIGNUM *res;
-    BN_CTX *ctx;
 
     char *sha256ofMsg = calloc(SHA256_HEX_STRING, sizeof(char));
     unsigned char *outBytesOfsha256ofMsg = calloc(SHA256_STRING, sizeof(unsigned char));
@@ -326,11 +325,6 @@ int signMessageWithPem(char *message, char *pem, char **signature) {
     sha256ofMsg[64] = '\0';
     createDataWithHexString(sha256ofMsg, &outBytesOfsha256ofMsg);
     
-    BN_init(&start);
-    ctx = BN_CTX_new();
-    
-    res = &start;
-
     in = BIO_new(BIO_s_mem());
     BIO_puts(in, pem);
     key = PEM_read_bio_ECPrivateKey(in, NULL, NULL, NULL);
@@ -360,7 +354,6 @@ int signMessageWithPem(char *message, char *pem, char **signature) {
     signature[derSigLen * 2] = '\0';
 
     EC_KEY_free(key);
-    BN_CTX_free(ctx);
 
     BIO_free_all(in);
     free(sha256ofMsg);

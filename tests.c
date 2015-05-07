@@ -68,7 +68,7 @@ int main() {
         printf("Signature is not a valid length\n");
 
     if(strcmp(actual_start, expected_start) == 0)
-        printf("\n");
+        printf(".");
     else
         printf("Signature test - Expected: %s, Actual: %s\n", expected_start, actual_start);
     printf("\n");

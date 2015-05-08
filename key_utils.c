@@ -187,6 +187,7 @@ int getPublicKeyFromPem(char *pemstring, char **pubkey) {
         buildCompPub[66] = '\0';
         memcpy(*pubkey, buildCompPub, 67);
     }
+
     free(buildCompPub);
     BN_CTX_free(ctx);
     EC_KEY_free(eckey);

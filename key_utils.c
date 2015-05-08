@@ -5,6 +5,7 @@ static int createNewKey(EC_GROUP *group, EC_KEY *eckey);
 static int createDataWithHexString(char *inputString, uint8_t **result);
 static int base58encode(char *input, char *base58encode);
 static int digestOfBytes(uint8_t *message, char **output, char *type, int inLength);
+static int toHexString(char *input, int inLength, char **output);
 
 int generatePem(char **pem) {
 
@@ -292,19 +293,19 @@ static int digestOfBytes(uint8_t *message, char **output, char *type, int inLeng
     return 0;
 }
 
-int toHexString(char *input, int inLength, char *output) {
+static int toHexString(char *input, int inLength, char **output) {
     
     uint8_t *byteData = (uint8_t*)malloc(inLength);
     memcpy(byteData, input, inLength);
 
     unsigned int i;
-    char *digest = calloc(inLength*2, sizeof(char));
+    char *digest = calloc((inLength*2) + 1, sizeof(char));
 
     for (i = 0; i < inLength; i++) {
         sprintf(&digest[2*i], "%02x", byteData[i]);
     }
 
-    memcpy(output, digest, strlen(digest));
+    memcpy(*output, digest, strlen(digest));
     free(digest);
     return NOERROR;
 }
@@ -313,6 +314,8 @@ int signMessageWithPem(char *message, char *pem, char **signature) {
 
     unsigned int meslen = strlen(message);
     unsigned char *messagebytes = calloc(meslen, sizeof(unsigned char));
+    int derSigLen = 0;
+    int i = 0;
     memcpy(messagebytes, message, meslen);
 
     EC_KEY *key = NULL;
@@ -330,26 +333,33 @@ int signMessageWithPem(char *message, char *pem, char **signature) {
     BIO_puts(in, pem);
     key = PEM_read_bio_ECPrivateKey(in, NULL, NULL, NULL);
     
-    ECDSA_SIG *sig = ECDSA_do_sign((const unsigned char*)outBytesOfsha256ofMsg, SHA256_DIGEST_LENGTH, key);
-    
-    int verify = ECDSA_do_verify((const unsigned char*)outBytesOfsha256ofMsg, SHA256_DIGEST_LENGTH, sig, key);
-    
-    if(verify != 1) {
-        return ERROR;
+    if(key == NULL){
+       return ERROR;
+    } 
+    while(derSigLen < 70 && i < 10){
+        i++;
+        ECDSA_SIG *sig = ECDSA_do_sign((const unsigned char*)outBytesOfsha256ofMsg, SHA256_DIGEST_LENGTH, key);
+        
+        int verify = ECDSA_do_verify((const unsigned char*)outBytesOfsha256ofMsg, SHA256_DIGEST_LENGTH, sig, key);
+        
+        if(verify != 1) {
+            return ERROR;
+        }
+
+        int buflen = ECDSA_size(key);
+        buffer = OPENSSL_malloc(buflen);
+
+        derSigLen = i2d_ECDSA_SIG(sig, &buffer);
     }
-
-    int buflen = ECDSA_size(key);
-    buffer = OPENSSL_malloc(buflen);
-
-    int derSigLen = i2d_ECDSA_SIG(sig, &buffer);
-
+    if(i == 10)
+        return ERROR;
     char *hexData = calloc(derSigLen, sizeof(char));
     memcpy(hexData, buffer-derSigLen, derSigLen);
 
     char *hexString = calloc(derSigLen*2+1, sizeof(char));
 
     hexString[derSigLen * 2] = '\0';
-    toHexString(hexData, derSigLen, hexString);
+    toHexString(hexData, derSigLen, &hexString);
     
     memcpy(*signature, hexString, derSigLen*2);
     signature[derSigLen * 2] = '\0';

@@ -9,6 +9,7 @@ static int toHexString(char *input, int inLength, char **output);
 
 int generatePem(char **pem) {
 
+    char *pemholder = calloc(224, sizeof(char));
     EC_KEY *eckey = NULL;
 
     BIO *out = BIO_new(BIO_s_mem());
@@ -27,12 +28,17 @@ int generatePem(char **pem) {
 
     BIO_get_mem_ptr(out, &buf);
 
+    memcpy(pemholder, buf->data, 223);
+
     if ( buf->data[219] == '\n') {
-        memcpy(*pem, buf->data, 219);
+        pemholder[220] = '\0';       
+        memcpy(*pem, pemholder, 221);
     } else if ( buf->data[221] == '\n') {
-        memcpy(*pem, buf->data, 221);
+        pemholder[222] = '\0';       
+        memcpy(*pem, pemholder, 223);
     } else {
-        memcpy(*pem, buf->data, 223);
+        pemholder[223] = '\0';
+        memcpy(*pem, pemholder, 224);
     }
 
     EC_KEY_free(eckey);

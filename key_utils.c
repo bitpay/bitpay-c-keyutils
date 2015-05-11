@@ -358,11 +358,10 @@ int signMessageWithPem(char *message, char *pem, char **signature) {
 
     char *hexString = calloc(derSigLen*2+1, sizeof(char));
 
-    hexString[derSigLen * 2] = '\0';
     toHexString(hexData, derSigLen, &hexString);
+    hexString[derSigLen * 2] = '\0';
     
-    memcpy(*signature, hexString, derSigLen*2);
-    signature[derSigLen * 2] = '\0';
+    memcpy(*signature, hexString, (derSigLen*2)+ 1);
 
     EC_KEY_free(key);
 

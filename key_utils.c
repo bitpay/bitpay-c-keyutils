@@ -107,9 +107,8 @@ int generateSinFromPem(char *pem, char **sin) {
     step6[RIPEMD_AND_PADDING_HEX + CHECKSUM] = '\0';
 
     base58encode(step6, base58OfStep6);
-    
-    memcpy(*sin, base58OfStep6, SIN);
-    sin[SIN] = '\0';
+    base58OfStep6[SIN] = '\0'; 
+    memcpy(*sin, base58OfStep6, SIN_STRING);
 
     free(pub);  
     free(step1);

@@ -10,6 +10,7 @@ int main() {
     runPublicKeyTest();
     runSinTest();
     runSignatureTest();
+    return 0;
 }
 
 static void runSignatureTest() {

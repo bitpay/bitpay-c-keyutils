@@ -10,7 +10,6 @@ int main() {
     runPublicKeyTest();
     runSinTest();
     runSignatureTest();
-    return 1;
 }
 
 static void runSignatureTest() {
@@ -19,7 +18,7 @@ static void runSignatureTest() {
     char *pem = malloc(240);
     char *signature = calloc(145, sizeof(char));
     char *actual_start = calloc(4, sizeof(char));
-    char *expected_start;
+    char *expected_start = "";
 
     pem[240]='\0';
     generatePem(&pem);
@@ -29,19 +28,21 @@ static void runSignatureTest() {
     };
     actual_start[4] = '\0';
     memcpy(actual_start, signature, 4);
-    if(strlen(signature) == 140)
+    if(strlen(signature) == 138)
+        expected_start = "3043";
+    else if(strlen(signature) == 140)
         expected_start = "3044";
     else if(strlen(signature) == 142)
         expected_start = "3045";
     else if(strlen(signature) == 144)
         expected_start = "3046";
     else
-        printf("Signature is not a valid length\n");
+        printf("%lu is not a valid signature length\n", (unsigned long)strlen(signature));
 
     if(strcmp(actual_start, expected_start) == 0)
         printf(".");
     else
-        printf("Signature test - Expected: %s, Actual: %s\n", expected_start, actual_start);
+        printf("Signature test - Expected: %s, Actual: %s for %s\n", expected_start, actual_start, signature);
     printf("\n");
 
     free(pem);
@@ -53,7 +54,7 @@ static void runSinTest() {
     char *fixed_pem = "-----BEGIN EC PRIVATE KEY-----\nMHQCAQEEIOg1/L9j0a63o5mRtzmG6N3Cn76MDpbUd2ZYAy4kYmq1oAcGBSuBBAAK\noUQDQgAE2IauvNs634tRrspRnEMbv9dQ84xoqBFilQQkmhHZJde+/8VwpMQ4wIQP\nYB429LjWsy3VyOF8vUpUmIvx17g/7g==\n-----END EC PRIVATE KEY-----\n";
     int singood;
     char *expected_sin = "Tf41EHiUGugMMeAR35DXfUrfkjzwmvqRQkz";
-    char *sin = malloc(36);
+    char *sin = calloc(35, sizeof(char));
 
     singood = generateSinFromPem(fixed_pem, &sin);
     if(singood == ERROR)

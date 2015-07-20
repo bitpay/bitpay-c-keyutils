@@ -1,6 +1,7 @@
 # BitPay Key Utilities for C
-[![Build Status](https://img.shields.io/travis/bitpay/bitpay-c-keyutils.svg?style=flat-square)](https://travis-ci.org/bitpay/bitpay-c-keyutils)
 [![MIT Licence](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](http://opensource.org/licenses/MIT)
+[![Build Status](https://img.shields.io/travis/bitpay/bitpay-c-keyutils.svg?style=flat-square)](https://travis-ci.org/bitpay/bitpay-c-keyutils)
+
 
 Provides required cryptographic functions to use the BitPay 2.0 API.
 

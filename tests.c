@@ -7,9 +7,9 @@ static void runSignatureTest();
 
 int main() {
     runPemTest();
-    //runPublicKeyTest();
-    //runSinTest();
-    //runSignatureTest();
+    runPublicKeyTest();
+    runSinTest();
+    runSignatureTest();
     return 0;
 }
 
@@ -91,7 +91,9 @@ static void runPublicKeyTest(){
 
 static void runPemTest() {
     char *expected_pem_S = "MHQCAQ";
+    char *expected_pem_S_alt = "MHMCAQ";
     char *expected_pem_N = "SuBBAAK\n";
+    char *expected_pem_N_alt = "4EEAAqh\n";
     char *actual_pem_S = calloc(7, sizeof(char));
     char *actual_pem_N = calloc(9, sizeof(char));
     char *pem = calloc(240, sizeof(char));
@@ -109,9 +111,13 @@ static void runPemTest() {
 
     if (strcmp(expected_pem_S, actual_pem_S) == 0)
         printf(".");
+    else if(strcmp(expected_pem_S_alt, actual_pem_S) == 0)
+        printf(".");
     else
-        printf("Pem test - Expected: %s, Actual: %s\n", expected_pem_S, actual_pem_S);
+        printf("Pem test - Expected: %s, Actual: %s\n, for string length: %lu\n", expected_pem_S, actual_pem_S, strlen(pem));
     if (strcmp(expected_pem_N, actual_pem_N) == 0)
+        printf(".");
+    else if (strcmp(expected_pem_N_alt, actual_pem_N) == 0)
         printf(".");
     else
         printf("Pem test - Expected: %s, Actual: %s\n", expected_pem_N, actual_pem_N);

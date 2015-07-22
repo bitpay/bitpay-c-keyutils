@@ -331,7 +331,7 @@ static int digestOfBytes(uint8_t *message, char **output, char *type, int inLeng
     memcpy(*output, digest, strlen(digest));
     free(digest);
     /* Call this once before exit. */
-    EVP_cleanup();
+    //EVP_cleanup();
     return 0;
 }
 

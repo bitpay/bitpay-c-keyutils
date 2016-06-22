@@ -22,11 +22,15 @@ static void runSignatureTest() {
     char *expected_start = calloc(5, sizeof(char));
 
     pem[239]='\0';
-    generatePem(&pem);
+    
+    if (generatePem(&pem) == ERROR) {
+        printf("Error in generatePem");
+    }
+    
     signa = signMessageWithPem(message, pem, &signature);
     if (signa == ERROR) {
         printf("Signature Error.\n");
-    };
+    }
     actual_start[3] = '\0';
     memcpy(actual_start, signature, 4);
     if (strlen(signature) == 138) {

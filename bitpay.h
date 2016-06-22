@@ -35,5 +35,4 @@
 int generatePem(char **pem);
 int generateSinFromPem(char *pem, char **sin);
 int getPublicKeyFromPem(char *pemstring, char **pubkey);
-int signMessageWithPem(char *pem, char *message, char **signature); 
-
+int signMessageWithPem(char *message, char *pem, char **signature);

@@ -1,4 +1,3 @@
-
 #include "bitpay.h"
 
 static int createNewKey(EC_GROUP *group, EC_KEY *eckey);
@@ -13,15 +12,14 @@ int generatePem(char **pem) {
     char *pemholder = calloc(240, sizeof(char));
     EC_KEY *eckey = NULL;
     BIO *out = NULL;
-
+    BUF_MEM *buf = NULL;
+    EC_GROUP *group = NULL;
+    
     if ((out = BIO_new(BIO_s_mem())) == NULL) {
         returnError = ERROR;
         errorMessage = "Error in BIO_new(BIO_s_mem())";
         goto clearVariables;
     }
-    
-    BUF_MEM *buf = NULL;
-    EC_GROUP *group = NULL;
     
     if ((group = EC_GROUP_new_by_curve_name(NID_secp256k1)) == NULL) {
         returnError = ERROR;
@@ -38,12 +36,14 @@ int generatePem(char **pem) {
 
     if (createNewKey(group, eckey) == ERROR) {
         returnError = ERROR;
-        errorMessage = "createNewKey(group, eckey)";
+        errorMessage = "Error in createNewKey(group, eckey)";
         goto clearVariables;
     }
 
     if (PEM_write_bio_ECPrivateKey(out, eckey, NULL, NULL, 0, NULL, NULL) == 0) {
-        printf("PEM_write_bio_ECPrivateKey error");
+        returnError = ERROR;
+        errorMessage = "Error in PEM_write_bio_ECPrivateKey(out, eckey, NULL, NULL, 0, NULL, NULL)";
+        goto clearVariables;
     }
 
     BIO_get_mem_ptr(out, &buf);
@@ -63,7 +63,7 @@ int generatePem(char **pem) {
         memcpy(*pem, pemholder, 224);
     } else {
         returnError = ERROR;
-        errorMessage = "invalid PEM generated";
+        errorMessage = "Invalid PEM generated";
         goto clearVariables;
     }
 
@@ -167,6 +167,7 @@ int generateSinFromPem(char *pem, char **sin) {
     free(outBytesOfStep1);
     free(outBytesOfStep3);
     free(outBytesOfStep4a);
+    
     return NOERROR;
 }
 
@@ -287,7 +288,7 @@ static int base58encode(char *input, char *base58encode) {
     int lengthofstring = 0;
     int startat = 34;
 
-    while(BN_is_zero(bnfromhex) != 1){
+    while(BN_is_zero(bnfromhex) != 1) {
       int rem = BN_mod_word(bnfromhex, 58);
       buildString[startat] = codeString[rem];
       BN_div_word(bnfromhex, 58);
@@ -324,15 +325,19 @@ static int digestOfBytes(uint8_t *message, char **output, char *type, int inLeng
     EVP_MD_CTX_destroy(mdctx);
 
     char *digest = calloc((md_len*2) + 1, sizeof(char));
-    for(i = 0; i < md_len; i++){
+    
+    for(i = 0; i < md_len; i++) {
       sprintf(&digest[2*i], "%02x", md_value[i]);
-    };
+    }
+    
     digest[md_len * 2] = '\0';
     memcpy(*output, digest, strlen(digest));
+    
     free(digest);
     /* Call this once before exit. */
     //EVP_cleanup();
-    return 0;
+    
+    return NOERROR;
 }
 
 static int toHexString(char *input, int inLength, char **output) {
@@ -348,7 +353,10 @@ static int toHexString(char *input, int inLength, char **output) {
     }
 
     memcpy(*output, digest, strlen(digest));
+    
+    free(byteData);
     free(digest);
+    
     return NOERROR;
 }
 
@@ -375,10 +383,10 @@ int signMessageWithPem(char *message, char *pem, char **signature) {
     BIO_puts(in, pem);
     key = PEM_read_bio_ECPrivateKey(in, NULL, NULL, NULL);
     
-    if(key == NULL){
+    if(key == NULL) {
        return ERROR;
     } 
-    while(derSigLen < 70 && i < 10){
+    while(derSigLen < 70 && i < 10) {
         i++;
         ECDSA_SIG *sig = ECDSA_do_sign((const unsigned char*)outBytesOfsha256ofMsg, SHA256_DIGEST_LENGTH, key);
         
@@ -406,8 +414,9 @@ int signMessageWithPem(char *message, char *pem, char **signature) {
     memcpy(*signature, hexString, (derSigLen*2)+ 1);
 
     EC_KEY_free(key);
-
     BIO_free_all(in);
+    
+    free(messagebytes);
     free(sha256ofMsg);
     free(outBytesOfsha256ofMsg);
     free(hexData);

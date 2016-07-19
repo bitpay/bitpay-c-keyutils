@@ -20,7 +20,7 @@ int main() {
 
 static void runPrivateKeyTest() {
     char *privateKeyHexString = calloc(BTC_ECKEY_PKEY_LENGTH * 2, sizeof(char));
-    
+ 
     printf("(1/4) Running Private Key Test...\n\t");
 
     if (generatePrivateKey(&privateKeyHexString) == ERROR) {
@@ -44,6 +44,7 @@ static void runPublicKeyTest() {
     } else {
         if(strcmp(publicKeyHexString, publicKeyExpected) != 0) {
             printf("\n\tPublic Keys are not equal!\n\t");
+            printf("Actual  : <%s>\n\tExpected: <%s>", publicKeyHexString, publicKeyExpected);
         } else {
             printf("\n\tOK!");
         }
@@ -64,6 +65,7 @@ static void runSinGenerationTest() {
     } else {
         if(strcmp(sin, sinExpected) != 0) {
             printf("\n\tSINs are not equal!\n\t");
+            printf("Actual  : <%s>\n\tExpected: <%s>", sin, sinExpected);
         } else {
             printf("\n\tOK!");
         }
@@ -85,7 +87,8 @@ static void runSignatureTest() {
         printf("\n\tError in signMessageWithPrivateKey!\n\t");
     } else {
         if(strcmp(signature, sigDERExpected) != 0) {
-            printf("\n\tDER Signatures are not equal!\n\n");
+            printf("\n\tDER Signatures are not equal!\n\t");
+            printf("Actual  : <%s>\n\tExpected: <%s>\n", signature, sigDERExpected);
         } else {
             printf("\n\tOK!\n");
         }
@@ -97,7 +100,8 @@ static void runSignatureTest() {
         printf("\n\tError in signMessageWithPrivateKey!\n\t");
     } else {
         if(strcmp(signature, sigCompactExpected) != 0) {
-            printf("\n\tCompact Signatures are not equal!\n\n");
+            printf("\n\tCompact Signatures are not equal!\n\t");
+            printf("Actual  : <%s>\n\tExpected: <%s>\n\n", signature, sigCompactExpected);
         } else {
             printf("\n\tOK!\n\n");
         }

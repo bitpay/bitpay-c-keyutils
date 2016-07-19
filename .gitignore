@@ -1,3 +1,6 @@
+*.swp
+a.out
+*.dSYM
 main
 key_utils_tests
 .vagrant

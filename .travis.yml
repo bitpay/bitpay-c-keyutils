@@ -2,4 +2,6 @@ language: c
 compiler:
   - clang
   - gcc
+before_install:
+  - pushd lib/libbtc && sh autogen.sh && ./configure --enable-shared=no && make && popd
 script: sh build.sh

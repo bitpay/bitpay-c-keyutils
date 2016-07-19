@@ -96,7 +96,7 @@ int generateSinFromPrivateKey(char *privateKeyHexString, char **sin) {
 
     // Encode.
     length = 26;
-    size_t lengthb58;
+    size_t lengthb58 = SIN_STRING_LENGTH;
     btc_base58_encode(sinBase58, &lengthb58, concatenationCheckSum, length);
     memcpy(*sin, sinBase58, lengthb58);
 

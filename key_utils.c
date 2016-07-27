@@ -1,426 +1,155 @@
 #include "bitpay.h"
 
-static int createNewKey(EC_GROUP *group, EC_KEY *eckey);
-static int createDataWithHexString(char *inputString, uint8_t **result);
-static int base58encode(char *input, char *base58encode);
-static int digestOfBytes(uint8_t *message, char **output, char *type, int inLength);
-static int toHexString(char *input, int inLength, char **output);
+static int genPubKeyFromPrivKeyRaw(char *privateKeyHexString, btc_pubkey *pubkey);
 
-int generatePem(char **pem) {
-    int returnError = NOERROR;
-    char * errorMessage = "";
-    char *pemholder = calloc(240, sizeof(char));
-    EC_KEY *eckey = NULL;
-    BIO *out = NULL;
-    BUF_MEM *buf = NULL;
-    EC_GROUP *group = NULL;
-    
-    if ((out = BIO_new(BIO_s_mem())) == NULL) {
-        returnError = ERROR;
-        errorMessage = "Error in BIO_new(BIO_s_mem())";
-        goto clearVariables;
-    }
-    
-    if ((group = EC_GROUP_new_by_curve_name(NID_secp256k1)) == NULL) {
-        returnError = ERROR;
-        errorMessage = "Error in EC_GROUP_new_by_curve_name(NID_secp256k1))";
-        goto clearVariables;
-    }
+int generatePrivateKey(char **privateKeyHexString) {
+    int returnCode = NOERROR;
+    btc_key key;
 
-    if (((eckey = EC_KEY_new()) == NULL) ||
-        ((buf = BUF_MEM_new()) == NULL)) {
-        returnError = ERROR;
-        errorMessage = "Error in EC_KEY_new())";
-        goto clearVariables;
-    };
+    btc_privkey_init(&key);
+    btc_privkey_gen(&key);
 
-    if (createNewKey(group, eckey) == ERROR) {
-        returnError = ERROR;
-        errorMessage = "Error in createNewKey(group, eckey)";
-        goto clearVariables;
-    }
-
-    if (PEM_write_bio_ECPrivateKey(out, eckey, NULL, NULL, 0, NULL, NULL) == 0) {
-        returnError = ERROR;
-        errorMessage = "Error in PEM_write_bio_ECPrivateKey(out, eckey, NULL, NULL, 0, NULL, NULL)";
-        goto clearVariables;
-    }
-
-    BIO_get_mem_ptr(out, &buf);
-
-    memcpy(pemholder, buf->data, 224);
-    if (buf->data[218] == '\n') {
-        pemholder[219] = '\0';
-        memcpy(*pem, pemholder, 220);
-    } else if ( buf->data[219] == '\n') {
-        pemholder[220] = '\0';       
-        memcpy(*pem, pemholder, 221);
-    } else if ( buf->data[221] == '\n') {
-        pemholder[222] = '\0';       
-        memcpy(*pem, pemholder, 223);
-    } else if (buf->data[222] == '\n') {
-        pemholder[223] = '\0';
-        memcpy(*pem, pemholder, 224);
+    if(btc_privkey_is_valid(&key)) {
+        char *privKeyHexString = utils_uint8_to_hex(key.privkey, BTC_ECKEY_PKEY_LENGTH);
+        memcpy(*privateKeyHexString, privKeyHexString, BTC_ECKEY_PKEY_LENGTH * 2);
     } else {
-        returnError = ERROR;
-        errorMessage = "Invalid PEM generated";
-        goto clearVariables;
+        returnCode = ERROR;
     }
 
-    goto clearVariables;
+    btc_privkey_cleanse(&key);
 
-clearVariables:
-    if (group != NULL)
-        EC_GROUP_clear_free(group);
-    if (pemholder != NULL) 
-        free(pemholder);
-    if (eckey != NULL)
-        EC_KEY_free(eckey);
-    if (out != NULL)
-        BIO_free_all(out);
-    if (errorMessage[0] != '\0')
-        printf("Error: %s\n", errorMessage);
+    return returnCode;
+}
 
-    return returnError;
-};
+int generatePublicKeyFromPrivateKey(char *privateKeyHexString, char **publicKeyHexString) {
+    int returnCode = NOERROR;
+    btc_pubkey pubkey;
+    btc_pubkey_init(&pubkey);
 
-static int createNewKey(EC_GROUP *group, EC_KEY *eckey) {
+    if(genPubKeyFromPrivKeyRaw(privateKeyHexString, &pubkey) == NOERROR) {
+        size_t size = 66;
+        btc_pubkey_get_hex(&pubkey, *publicKeyHexString, &size);
+    } else {
+        returnCode = ERROR;
+    }
 
-    int asn1Flag = OPENSSL_EC_NAMED_CURVE;
-    int form = POINT_CONVERSION_UNCOMPRESSED;
+    btc_pubkey_cleanse(&pubkey);
+    
+    return returnCode;
+}
 
-    EC_GROUP_set_asn1_flag(group, asn1Flag);
-    EC_GROUP_set_point_conversion_form(group, form);
-    int setGroupError = EC_KEY_set_group(eckey, group);
+static int genPubKeyFromPrivKeyRaw(char *privateKeyHexString, btc_pubkey *pubkey) {
+    int returnCode = NOERROR;
+    btc_key key;
 
-    int resultFromKeyGen = EC_KEY_generate_key(eckey);
+    uint8_t *privateKey = utils_hex_to_uint8(privateKeyHexString);
 
-    if (resultFromKeyGen != 1 || setGroupError != 1){
+    btc_privkey_init(&key);
+    memcpy(key.privkey, privateKey, BTC_ECKEY_PKEY_LENGTH);
+
+    if(btc_privkey_is_valid(&key)) {
+        btc_pubkey_init(pubkey);
+        // libbtc generates compressed public keys by default.
+        btc_pubkey_from_key(&key, pubkey);
+
+        if(!btc_privkey_verify_pubkey(&key, pubkey)) {
+            returnCode = ERROR;
+        }
+    } else {
+        returnCode = ERROR;
+    }
+
+    btc_privkey_cleanse(&key);
+    
+    return returnCode;
+}
+
+int generateSinFromPrivateKey(char *privateKeyHexString, char **sin) {
+    btc_pubkey pubkey;
+    btc_pubkey_init(&pubkey);
+
+    if(genPubKeyFromPrivKeyRaw(privateKeyHexString, &pubkey) == ERROR) {
+        btc_pubkey_cleanse(&pubkey);
         return ERROR;
     }
+
+    uint8_t *hash256And160 = calloc(20, sizeof(uint8_t));
+    uint8_t *concatenation  = calloc(22, sizeof(uint8_t));
+    uint8_t *doubleHash256  = calloc(SHA256_LENGTH, sizeof(uint8_t));
+    uint8_t *concatenationCheckSum  = calloc(26, sizeof(uint8_t));
+    char *sinBase58  = calloc(SIN_STRING_LENGTH, sizeof(uint8_t));
+
+    // Compute ripemd160(sha256(pubkey)).
+    btc_pubkey_get_hash160(&pubkey, hash256And160);
+
+    // Include additional bytes at the beginning.
+    memcpy(concatenation, "\x0F\x02", 2);
+    memcpy(concatenation + 2, hash256And160, 20);
+
+    // Double hash256 to get the checksum.
+    size_t length = 22;
+    btc_hash(concatenation, length, doubleHash256);
+
+    // Extract checksum and concatenate.
+    memcpy(concatenationCheckSum, concatenation, 22);
+    memcpy(concatenationCheckSum + 22, doubleHash256, 4);
+
+    // Encode.
+    length = 26;
+    size_t lengthb58 = SIN_STRING_LENGTH;
+    btc_base58_encode(sinBase58, &lengthb58, concatenationCheckSum, length);
+    memcpy(*sin, sinBase58, lengthb58);
+
+    free(hash256And160);
+    free(concatenation);
+    free(doubleHash256);
+    free(concatenationCheckSum);
+    free(sinBase58);
+    btc_pubkey_cleanse(&pubkey);
 
     return NOERROR;
 }
 
-int generateSinFromPem(char *pem, char **sin) {
-    
-    char *pub =     calloc(67, sizeof(char));
+int signMessageWithPrivateKey(char *message, char *privateKeyHexString, char **signature, btc_bool compact) {
+    uint8_t *hash256  = calloc(SHA256_LENGTH, sizeof(uint8_t));
+    unsigned char *sig = calloc(MAX_SIGNATURE_BYTES_LENGTH, sizeof(unsigned char));
+    size_t outlen = MAX_SIGNATURE_BYTES_LENGTH;
+    int returnCode = NOERROR;
+    btc_key key;
 
-    u_int8_t *outBytesPub = calloc(SHA256_STRING, sizeof(u_int8_t));
-    u_int8_t *outBytesOfStep1 = calloc(SHA256_STRING, sizeof(u_int8_t));
-    u_int8_t *outBytesOfStep3 = calloc(RIPEMD_AND_PADDING_STRING, sizeof(u_int8_t));
-    u_int8_t *outBytesOfStep4a = calloc(SHA256_STRING, sizeof(u_int8_t));
+    uint8_t *privateKey = utils_hex_to_uint8(privateKeyHexString);
 
-    char *step1 =   calloc(SHA256_HEX_STRING, sizeof(char));
-    char *step2 =   calloc(RIPEMD_HEX_STRING, sizeof(char));
-    char *step3 =   calloc(RIPEMD_AND_PADDING_HEX_STRING, sizeof(char));
-    char *step4a =  calloc(SHA256_HEX_STRING, sizeof(char));
-    char *step4b =  calloc(SHA256_HEX_STRING, sizeof(char));
-    char *step5 =   calloc(CHECKSUM_STRING, sizeof(char));
-    char *step6 =   calloc(RIPEMD_AND_PADDING_HEX + CHECKSUM_STRING, sizeof(char));
+    btc_privkey_init(&key);
+    memcpy(key.privkey, privateKey, BTC_ECKEY_PKEY_LENGTH);
 
-    char *base58OfStep6 = calloc(SIN_STRING, sizeof(char));
+    btc_hash_sngl_sha256((unsigned char *)message, strlen(message), hash256);
 
-    getPublicKeyFromPem(pem, &pub);
-    pub[66] = '\0';
-
-    createDataWithHexString(pub, &outBytesPub);
-    digestOfBytes(outBytesPub, &step1, "sha256", SHA256_STRING);
-    step1[64] = '\0';
-
-    createDataWithHexString(step1, &outBytesOfStep1);
-    digestOfBytes(outBytesOfStep1, &step2, "ripemd160", SHA256_DIGEST_LENGTH);
-    step2[40] = '\0';
-   
-    memcpy(step3, "0F02", 4);
-    memcpy(step3+4, step2, RIPEMD_HEX);
-    step3[44] = '\0';
-
-    createDataWithHexString(step3, &outBytesOfStep3);
-    digestOfBytes(outBytesOfStep3, &step4a, "sha256", RIPEMD_AND_PADDING);
-    step4a[64] = '\0';
-
-    createDataWithHexString(step4a, &outBytesOfStep4a);
-    digestOfBytes(outBytesOfStep4a, &step4b, "sha256", SHA256_DIGEST_LENGTH);
-    step4b[64] = '\0';
-
-    memcpy(step5, step4b, CHECKSUM);
-    
-    sprintf(step6, "%s%s", step3, step5);
-    step6[RIPEMD_AND_PADDING_HEX + CHECKSUM] = '\0';
-
-    base58encode(step6, base58OfStep6);
-    base58OfStep6[SIN] = '\0'; 
-    memcpy(*sin, base58OfStep6, SIN_STRING);
-
-    free(pub);  
-    free(step1);
-    free(step2);
-    free(step3);
-    free(step4a);
-    free(step4b);
-    free(step5);
-    free(step6);
-    free(base58OfStep6);
-
-    free(outBytesPub);
-    free(outBytesOfStep1);
-    free(outBytesOfStep3);
-    free(outBytesOfStep4a);
-    
-    return NOERROR;
-}
-
-int getPublicKeyFromPem(char *pemstring, char **pubkey) {
-
-    EC_KEY *eckey = NULL;
-    EC_KEY *key = NULL;
-    EC_POINT *pub_key = NULL;
-    BIO *in = NULL;
-    const EC_GROUP *group = NULL;
-    char *hexPoint = NULL;
-    char xval[65] = "";
-    char yval[65] = "";
-    char *oddNumbers = "13579BDF";
-
-    BIGNUM start;
-    const BIGNUM *res;
-    BN_CTX *ctx;
-
-    BN_init(&start);
-    ctx = BN_CTX_new();
-
-    res = &start;
-
-    const char *cPem = pemstring;
-    in = BIO_new(BIO_s_mem());
-    BIO_puts(in, cPem);
-    key = PEM_read_bio_ECPrivateKey(in, NULL, NULL, NULL);
-    res = EC_KEY_get0_private_key(key);
-    eckey = EC_KEY_new_by_curve_name(NID_secp256k1);
-    group = EC_KEY_get0_group(eckey);
-    pub_key = EC_POINT_new(group);
-
-    EC_KEY_set_private_key(eckey, res);
-
-    if (!EC_POINT_mul(group, pub_key, res, NULL, NULL, ctx)) {
-        return ERROR;
-    }
-
-    EC_KEY_set_public_key(eckey, pub_key);
-
-    hexPoint = EC_POINT_point2hex(group, pub_key, 4, ctx);
-
-    char *hexPointxInit = hexPoint + 2;
-    memcpy(xval, hexPointxInit, 64);
-
-    char *hexPointyInit = hexPoint + 66;
-    memcpy(yval, hexPointyInit, 64);
-
-    char *lastY = hexPoint + 129;
-    hexPoint[130] = '\0';
-
-    char *buildCompPub = calloc(67, sizeof(char));
-
-    if (strstr(oddNumbers, lastY) != NULL) {
-        sprintf(buildCompPub, "03%s", xval);
-        buildCompPub[66] = '\0';
-        memcpy(*pubkey, buildCompPub, 67);
+    if(compact) {
+        if(!btc_key_sign_hash_compact(&key, hash256, sig, &outlen)) {
+            returnCode = ERROR;
+        }
     } else {
-        sprintf(buildCompPub, "02%s", xval);
-        buildCompPub[66] = '\0';
-        memcpy(*pubkey, buildCompPub, 67);
-    }
+        if(btc_key_sign_hash(&key, hash256, sig, &outlen)) {
+            btc_pubkey pubkey;
+            btc_pubkey_init(&pubkey);
+            btc_pubkey_from_key(&key, &pubkey);
 
-    free(buildCompPub);
-    BN_CTX_free(ctx);
-    EC_KEY_free(eckey);
-    EC_KEY_free(key);
-    EC_POINT_free(pub_key);
-    BIO_free(in);
-
-    return NOERROR;
-};
-
-static int createDataWithHexString(char *inputString, uint8_t **result) {
-
-    int i, o = 0;
-    uint8_t outByte = 0;
-
-    int inLength = strlen(inputString);
-
-    uint8_t *outBytes = malloc(sizeof(uint8_t) * ((inLength / 2) + 1));
-
-    for (i = 0; i < inLength; i++) {
-        uint8_t c = inputString[i];
-        int8_t value = -1;
-
-        if      (c >= '0' && c <= '9') value =      (c - '0');
-        else if (c >= 'A' && c <= 'F') value = 10 + (c - 'A');
-        else if (c >= 'a' && c <= 'f') value = 10 + (c - 'a');
-
-        if (value >= 0) {
-            if (i % 2 == 1) {
-                outBytes[o++] = (outByte << 4) | value;
-                outByte = 0;
-            } else {
-                outByte = value;
+            if(!btc_pubkey_verify_sig(&pubkey, hash256, sig, outlen)) {
+                returnCode = ERROR;
             }
 
+            btc_pubkey_cleanse(&pubkey);
         } else {
-            if (o != 0) break;
+            returnCode = ERROR;
         }
     }
-
-    memcpy(*result, outBytes, inLength/2);
-
-    free(outBytes);
-
-    return NOERROR;
-}
-
-static int base58encode(char *input, char *base58encode) {
-    BIGNUM *bnfromhex = BN_new();
-    BN_hex2bn(&bnfromhex, input);
-    char *codeString = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-
-    char buildString[35];
-    int lengthofstring = 0;
-    int startat = 34;
-
-    while(BN_is_zero(bnfromhex) != 1) {
-      int rem = BN_mod_word(bnfromhex, 58);
-      buildString[startat] = codeString[rem];
-      BN_div_word(bnfromhex, 58);
-      lengthofstring++;
-      startat--;
-    }
-    startat ++;
     
-    int j = 0;
-    int i;
-    for (i = startat; i < lengthofstring; i++) {
-      base58encode[j] = buildString[i];
-      j++;
-    }
+    char *sigHexString = utils_uint8_to_hex(sig, outlen);
+    memcpy(*signature, sigHexString, outlen * 2);
 
-    BN_free(bnfromhex);
+    btc_privkey_cleanse(&key);
+    free(hash256);
+    free(sig);
 
-    return NOERROR;
-}
-
-static int digestOfBytes(uint8_t *message, char **output, char *type, int inLength) {
-    EVP_MD_CTX *mdctx;
-    const EVP_MD *md;
-    unsigned char md_value[EVP_MAX_MD_SIZE];
-    unsigned int md_len, i;
-
-    OpenSSL_add_all_digests();
-
-    md = EVP_get_digestbyname(type);
-    mdctx = EVP_MD_CTX_create();
-    EVP_DigestInit_ex(mdctx, md, NULL);
-    EVP_DigestUpdate(mdctx, message, inLength);
-    EVP_DigestFinal_ex(mdctx, md_value, &md_len);
-    EVP_MD_CTX_destroy(mdctx);
-
-    char *digest = calloc((md_len*2) + 1, sizeof(char));
-    
-    for(i = 0; i < md_len; i++) {
-      sprintf(&digest[2*i], "%02x", md_value[i]);
-    }
-    
-    digest[md_len * 2] = '\0';
-    memcpy(*output, digest, strlen(digest));
-    
-    free(digest);
-    /* Call this once before exit. */
-    //EVP_cleanup();
-    
-    return NOERROR;
-}
-
-static int toHexString(char *input, int inLength, char **output) {
-    
-    uint8_t *byteData = (uint8_t*)malloc(inLength);
-    memcpy(byteData, input, inLength);
-
-    unsigned int i;
-    char *digest = calloc((inLength*2) + 1, sizeof(char));
-
-    for (i = 0; i < inLength; i++) {
-        sprintf(&digest[2*i], "%02x", byteData[i]);
-    }
-
-    memcpy(*output, digest, strlen(digest));
-    
-    free(byteData);
-    free(digest);
-    
-    return NOERROR;
-}
-
-int signMessageWithPem(char *message, char *pem, char **signature) {
-
-    unsigned int meslen = strlen(message);
-    unsigned char *messagebytes = calloc(meslen, sizeof(unsigned char));
-    int derSigLen = 0;
-    int i = 0;
-    memcpy(messagebytes, message, meslen);
-
-    EC_KEY *key = NULL;
-    BIO *in = NULL;
-    unsigned char *buffer = NULL;
-
-    char *sha256ofMsg = calloc(SHA256_HEX_STRING, sizeof(char));
-    unsigned char *outBytesOfsha256ofMsg = calloc(SHA256_STRING, sizeof(unsigned char));
-
-    digestOfBytes(messagebytes, &sha256ofMsg, "sha256", meslen);
-    sha256ofMsg[64] = '\0';
-    createDataWithHexString(sha256ofMsg, &outBytesOfsha256ofMsg);
-    
-    in = BIO_new(BIO_s_mem());
-    BIO_puts(in, pem);
-    key = PEM_read_bio_ECPrivateKey(in, NULL, NULL, NULL);
-    
-    if(key == NULL) {
-       return ERROR;
-    } 
-    while(derSigLen < 70 && i < 10) {
-        i++;
-        ECDSA_SIG *sig = ECDSA_do_sign((const unsigned char*)outBytesOfsha256ofMsg, SHA256_DIGEST_LENGTH, key);
-        
-        int verify = ECDSA_do_verify((const unsigned char*)outBytesOfsha256ofMsg, SHA256_DIGEST_LENGTH, sig, key);
-        
-        if(verify != 1) {
-            return ERROR;
-        }
-
-        int buflen = ECDSA_size(key);
-        buffer = OPENSSL_malloc(buflen);
-
-        derSigLen = i2d_ECDSA_SIG(sig, &buffer);
-    }
-    if(i == 10)
-        return ERROR;
-    char *hexData = calloc(derSigLen, sizeof(char));
-    memcpy(hexData, buffer-derSigLen, derSigLen);
-
-    char *hexString = calloc(derSigLen*2+1, sizeof(char));
-
-    toHexString(hexData, derSigLen, &hexString);
-    hexString[derSigLen * 2] = '\0';
-    
-    memcpy(*signature, hexString, (derSigLen*2)+ 1);
-
-    EC_KEY_free(key);
-    BIO_free_all(in);
-    
-    free(messagebytes);
-    free(sha256ofMsg);
-    free(outBytesOfsha256ofMsg);
-    free(hexData);
-    free(hexString);
-
-    return NOERROR;
+    return returnCode;
 }

@@ -1,132 +1,111 @@
 #include "bitpay.h"
 
-static void runPemTest();
+static void runPrivateKeyTest();
 static void runPublicKeyTest();
-static void runSinTest();
+static void runSinGenerationTest();
 static void runSignatureTest();
 
 int main() {
-    runPemTest();
+    btc_ecc_start();
+
+    runPrivateKeyTest();
     runPublicKeyTest();
-    runSinTest();
+    runSinGenerationTest();
     runSignatureTest();
+
+    btc_ecc_stop();
+
     return 0;
 }
 
-static void runSignatureTest() {
-    int signa;
-    char *message = "https://test.bitpay.com/invoices{\"currency\":\"USD\",\"price\":100,\"token\":\"GVTANyBKSJRdSzy88P72H2LB7gky7o4J8bebVbVaF6pA\"}";
-    char *pem = malloc(240);
-    char *signature = calloc(145, sizeof(char));
-    char *actual_start = calloc(4, sizeof(char));
-    char *expected_start = calloc(5, sizeof(char));
+static void runPrivateKeyTest() {
+    char *privateKeyHexString = calloc(BTC_ECKEY_PKEY_LENGTH * 2, sizeof(char));
+ 
+    printf("(1/4) Running Private Key Test...\n\t");
 
-    pem[239]='\0';
-    
-    if (generatePem(&pem) == ERROR) {
-        printf("Error in generatePem");
-    }
-    
-    signa = signMessageWithPem(message, pem, &signature);
-    if (signa == ERROR) {
-        printf("Signature Error.\n");
-    }
-    actual_start[3] = '\0';
-    memcpy(actual_start, signature, 4);
-    if (strlen(signature) == 138) {
-        memcpy(expected_start, "3043", 4);
-        expected_start[4] = '\0';
-    } else if (strlen(signature) == 140) {
-        memcpy(expected_start, "3044", 4);
-        expected_start[4] = '\0';
-    } else if (strlen(signature) == 142) {
-        memcpy(expected_start, "3045", 4);
-        expected_start[4] = '\0';
-    } else if (strlen(signature) == 144) {
-        memcpy(expected_start, "3046", 4);
-        expected_start[4] = '\0';
+    if (generatePrivateKey(&privateKeyHexString) == ERROR) {
+        printf("\n\tError in generatePrivateKey! Invalid Key.\n\t");
     } else {
-        printf("%lu is not a valid signature length\n", (unsigned long)strlen(signature));
+        printf("\n\tOK!");
     }
 
-    if (strcmp(actual_start, expected_start) == 0)
-        printf(".");
-    else
-        printf("Signature test - Expected: %s, Actual: %s for %s\n", expected_start, actual_start, signature);
-    printf("\n");
-
-    free(expected_start);
-    free(pem);
-    free(signature);
-    free(actual_start);
+    free(privateKeyHexString);
 }
 
-static void runSinTest() {
-    char *fixed_pem = "-----BEGIN EC PRIVATE KEY-----\nMHQCAQEEIOg1/L9j0a63o5mRtzmG6N3Cn76MDpbUd2ZYAy4kYmq1oAcGBSuBBAAK\noUQDQgAE2IauvNs634tRrspRnEMbv9dQ84xoqBFilQQkmhHZJde+/8VwpMQ4wIQP\nYB429LjWsy3VyOF8vUpUmIvx17g/7g==\n-----END EC PRIVATE KEY-----\n";
-    int singood;
-    char *expected_sin = "Tf41EHiUGugMMeAR35DXfUrfkjzwmvqRQkz";
-    char *sin = calloc(35, sizeof(char));
+static void runPublicKeyTest() {
+    char *privateKeyHexString = "97811b691dd7ebaeb67977d158e1da2c4d3eaa4ee4e2555150628acade6b344c";
+    char *publicKeyHexString = calloc(66, sizeof(char));
+    char publicKeyExpected[] = "02326209e52f6f17e987ec27c56a1321acf3d68088b8fb634f232f12ccbc9a4575";
 
-    singood = generateSinFromPem(fixed_pem, &sin);
-    if (singood == ERROR)
-        printf("Sin Error\n");
-    if (strcmp(expected_sin, sin) == 0)
-        printf(".");
-    else
-        printf("Sin test - Expected: %s, Actual: %s\n", expected_sin, sin);
+    printf("\n\n(2/4) Running Public Key Test...\n\t");
+
+    if(generatePublicKeyFromPrivateKey(privateKeyHexString, &publicKeyHexString) == ERROR) {
+        printf("\n\tError in generatePublicKeyFromPrivateKey!\n\t");
+    } else {
+        if(strcmp(publicKeyHexString, publicKeyExpected) != 0) {
+            printf("\n\tPublic Keys are not equal!\n\t");
+            printf("Actual  : <%s>\n\tExpected: <%s>", publicKeyHexString, publicKeyExpected);
+        } else {
+            printf("\n\tOK!");
+        }
+    }
+
+    free(publicKeyHexString);
+}
+
+static void runSinGenerationTest() {
+    char *privateKeyHexString = "97811b691dd7ebaeb67977d158e1da2c4d3eaa4ee4e2555150628acade6b344c";                         
+    char *sin = calloc(SIN_STRING_LENGTH, sizeof(char));
+    char sinExpected[] = "Tf3yr5tYvccKNVrE26BrPs6LWZRh8woHwjR";
+
+    printf("\n\n(3/4) Running SIN Generation Test...\n\t");
+
+    if(generateSinFromPrivateKey(privateKeyHexString, &sin) == ERROR) {
+        printf("\n\tError in generateSinFromPrivateKey!\n\t");
+    } else {
+        if(strcmp(sin, sinExpected) != 0) {
+            printf("\n\tSINs are not equal!\n\t");
+            printf("Actual  : <%s>\n\tExpected: <%s>", sin, sinExpected);
+        } else {
+            printf("\n\tOK!");
+        }
+    }
 
     free(sin);
 }
 
-static void runPublicKeyTest(){
-    char *pub = malloc(67);
-    char *fixed_pem = "-----BEGIN EC PRIVATE KEY-----\nMHQCAQEEIOg1/L9j0a63o5mRtzmG6N3Cn76MDpbUd2ZYAy4kYmq1oAcGBSuBBAAK\noUQDQgAE2IauvNs634tRrspRnEMbv9dQ84xoqBFilQQkmhHZJde+/8VwpMQ4wIQP\nYB429LjWsy3VyOF8vUpUmIvx17g/7g==\n-----END EC PRIVATE KEY-----\n";
-    char *expected_pub = "02D886AEBCDB3ADF8B51AECA519C431BBFD750F38C68A811629504249A11D925D7";
-    int pubgood = getPublicKeyFromPem(fixed_pem, &pub);
-    if (pubgood == ERROR)
-        printf("Error retrieving public key\n");
-    if (strcmp(expected_pub, pub) == 0)
-        printf(".");
-    else
-        printf("Public key test - Expected: %s, Actual: %s\n", expected_pub, pub);
+static void runSignatureTest() {
+    char *privateKeyHexString = "000000000000000000000000000000000000000000056916d0f9b31dc9b637f3";
+    char *message = "The question of whether computers can think is like the question of whether submarines can swim.";
+    char *signature = calloc(MAX_SIGNATURE_STRING_LENGTH, sizeof(char));
+    char sigDERExpected[] = "3045022100cde1302d83f8dd835d89aef803c74a119f561fbaef3eb9129e45f30de86abbf9022006ce643f5049ee1f27890467b77a6a8e11ec4661cc38cd8badf90115fbd03cef";
+    char sigCompactExpected[] = "cde1302d83f8dd835d89aef803c74a119f561fbaef3eb9129e45f30de86abbf906ce643f5049ee1f27890467b77a6a8e11ec4661cc38cd8badf90115fbd03cef";
 
-    free(pub);
-}
+    printf("\n\n(4/4) Running DER and Compact Signature Test...\n\t");
 
-static void runPemTest() {
-    char *expected_pem_S = "MHQCAQ";
-    char *expected_pem_S_alt = "MHMCAQ";
-    char *expected_pem_N = "SuBBAAK\n";
-    char *expected_pem_N_alt = "4EEAAqh\n";
-    char *actual_pem_S = calloc(7, sizeof(char));
-    char *actual_pem_N = calloc(9, sizeof(char));
-    char *pem = calloc(240, sizeof(char));
-
-    pem[239]='\0';
-
-    if (generatePem(&pem) == ERROR) {
-        printf("Error in generatePem");
+    if(signMessageWithPrivateKey(message, privateKeyHexString, &signature, false) == ERROR) {
+        printf("\n\tError in signMessageWithPrivateKey!\n\t");
+    } else {
+        if(strcmp(signature, sigDERExpected) != 0) {
+            printf("\n\tDER Signatures are not equal!\n\t");
+            printf("Actual  : <%s>\n\tExpected: <%s>\n", signature, sigDERExpected);
+        } else {
+            printf("\n\tOK!\n");
+        }
     }
 
-    actual_pem_S[6] = '\0';
-    actual_pem_N[8] = '\0';
-    memcpy(actual_pem_S, pem+31, 6);
-    memcpy(actual_pem_N, pem+88, 8);
+    memset(signature, 0, strlen(signature));
 
-    if (strcmp(expected_pem_S, actual_pem_S) == 0)
-        printf(".");
-    else if(strcmp(expected_pem_S_alt, actual_pem_S) == 0)
-        printf(".");
-    else
-        printf("Pem test - Expected: %s, Actual: %s\n, for string length: %lu\n", expected_pem_S, actual_pem_S, strlen(pem));
-    if (strcmp(expected_pem_N, actual_pem_N) == 0)
-        printf(".");
-    else if (strcmp(expected_pem_N_alt, actual_pem_N) == 0)
-        printf(".");
-    else
-        printf("Pem test - Expected: %s, Actual: %s\n", expected_pem_N, actual_pem_N);
+    if(signMessageWithPrivateKey(message, privateKeyHexString, &signature, true) == ERROR) {
+        printf("\n\tError in signMessageWithPrivateKey!\n\t");
+    } else {
+        if(strcmp(signature, sigCompactExpected) != 0) {
+            printf("\n\tCompact Signatures are not equal!\n\t");
+            printf("Actual  : <%s>\n\tExpected: <%s>\n\n", signature, sigCompactExpected);
+        } else {
+            printf("\n\tOK!\n\n");
+        }
+    }
 
-    free(pem);
-    free(actual_pem_S);
-    free(actual_pem_N);
+    free(signature);
 }

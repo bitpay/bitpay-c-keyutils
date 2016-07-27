@@ -21,5 +21,12 @@ API Documentation is available on the [BitPay site](https://bitpay.com/api).
 ## Running the Tests
 
 ```bash
+$ cd lib/libbtc/
+$ sh autogen.sh
+$ ./configure --enable-shared=no --with-bignum=no
+$ make
+$ cd -
 $ sh build.sh
 ```
+
+Note that during the building process `gmp` will be ignored with the option `--with-bignum=no` in case it is installed.
